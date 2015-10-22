@@ -37,6 +37,7 @@ extern BOOL (WINAPI * _ImmNotifyIME)( HIMC, DWORD, DWORD, DWORD );
 extern BOOL (WINAPI * _ImmSetConversionStatus)( HIMC, DWORD, DWORD );
 extern BOOL (WINAPI * _ImmSimulateHotKey)( HWND, DWORD );
 extern BOOL (WINAPI * _ImmIsIME)( HKL );
+extern UINT (WINAPI * _ImmGetDescriptionA) (IN HKL, __out_ecount_opt(uBufLen) LPSTR lpszDescription, IN UINT uBufLen);
 
 // Function pointers: Traditional Chinese IME
 extern UINT (WINAPI * _GetReadingString)( HIMC, UINT, LPWSTR, PINT, BOOL*, PUINT );

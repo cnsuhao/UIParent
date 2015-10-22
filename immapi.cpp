@@ -32,6 +32,7 @@ namespace immapi
 	static BOOL WINAPI Dummy_ImmSetConversionStatus( HIMC, DWORD, DWORD ) { return FALSE; }
 	static BOOL WINAPI Dummy_ImmSimulateHotKey( HWND, DWORD ) { return FALSE; }
 	static BOOL WINAPI Dummy_ImmIsIME( HKL ) { return FALSE; }
+	static UINT WINAPI Dummy_ImmGetDescriptionA(IN HKL, __out_ecount_opt(uBufLen) LPSTR lpszDescription, IN UINT uBufLen) { return 0; }
 
 	// Traditional Chinese IME
 	static UINT WINAPI Dummy_GetReadingString( HIMC, UINT, LPWSTR, PINT, BOOL*, PUINT ) { return 0; }
@@ -74,6 +75,7 @@ namespace immapi
 	BOOL (WINAPI * _ImmSetConversionStatus)( HIMC, DWORD, DWORD ) = Dummy_ImmSetConversionStatus;
 	BOOL (WINAPI * _ImmSimulateHotKey)( HWND, DWORD ) = Dummy_ImmSimulateHotKey;
 	BOOL (WINAPI * _ImmIsIME)( HKL ) = Dummy_ImmIsIME;
+	UINT (WINAPI * _ImmGetDescriptionA) (IN HKL, __out_ecount_opt(uBufLen) LPSTR lpszDescription, IN UINT uBufLen) = Dummy_ImmGetDescriptionA;
 
 	// Traditional Chinese IME
 	UINT (WINAPI * _GetReadingString)( HIMC, UINT, LPWSTR, PINT, BOOL*, PUINT ) = Dummy_GetReadingString;
@@ -190,6 +192,7 @@ namespace immapi
 			GETPROCADDRESS( s_hDllImm32, ImmSetConversionStatus, Temp );
 			GETPROCADDRESS( s_hDllImm32, ImmSimulateHotKey, Temp );
 			GETPROCADDRESS( s_hDllImm32, ImmIsIME, Temp );
+			GETPROCADDRESS( s_hDllImm32, ImmGetDescriptionA, Temp );
 		}
 
 		if( !::GetSystemDirectory( wszPath, MAX_PATH+1 ) )

@@ -355,13 +355,15 @@ void CDXUTControl::SetSize( int width, int height )
 void CDXUTControl::onActivated( CEGUI::ActivationEventArgs& e )
 {
 	CEGUI::Window::onActivated(e);
-	m_bHasFocus = true;
+	//m_bHasFocus = true;
+	e.handled = 0;
 }
 
 void CDXUTControl::onDeactivated( CEGUI::ActivationEventArgs& e )
 {
 	CEGUI::Window::onDeactivated(e);
-	m_bHasFocus = false;
+	//m_bHasFocus = false;
+	e.handled = 0;
 }
 // 
  void CDXUTControl::onMouseMove( CEGUI::MouseEventArgs& e )
@@ -408,11 +410,13 @@ void CDXUTControl::SetID( int ID )
 
  void CDXUTControl::onCharacter( CEGUI::KeyEventArgs& e )
  {
- 	Window::onCharacter(e);
- 	if (e.handled==0)
- 	{
- 		e.handled = MsgProc(WM_CHAR, e.codepoint, 0) ? 1:0;
- 	}
+//  	Window::onCharacter(e);
+//  	if (e.handled==0)
+//  	{
+//  		e.handled = MsgProc(WM_CHAR, e.codepoint, 0) ? 1:0;
+//  	}
+
+	 e.handled=0;
 }
 
  BOOL CDXUTControl::ContainsPoint( POINT pt )
@@ -805,7 +809,6 @@ bool CDXUTEditBox::HandleMouse( UINT uMsg, POINT pt, WPARAM wParam, LPARAM lPara
 				ResetCaretBlink();
 			}
 
-			printSelf();
 			return true;
 		}
 
@@ -1260,6 +1263,16 @@ CDXUTIMEEditBox::~CDXUTIMEEditBox()
 {
 }
 
+
+WORD CDXUTIMEEditBox::GetPrimaryLanguage()
+{
+	return PRIMARYLANGID( LOWORD( s_hklCurrent ) );
+}
+
+WORD CDXUTIMEEditBox::GetSubLanguage()
+{
+	return SUBLANGID( LOWORD( s_hklCurrent ) );
+}
 
 //--------------------------------------------------------------------------------------
 void CDXUTIMEEditBox::SendKey( BYTE nVirtKey )
@@ -1948,13 +1961,13 @@ bool CDXUTIMEEditBox::StaticMsgProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 
 					// If this language is already in the list, don't add it again.
 					bool bBreak = false;
-					for( int e = 0; e < s_Locale.GetSize(); ++e )
-						if( LOWORD( s_Locale.GetAt( e ).m_hKL ) ==
-							LOWORD( phKL[i] ) )
-						{
-							bBreak = true;
-							break;
-						}
+// 					for( int e = 0; e < s_Locale.GetSize(); ++e )
+// 						if( LOWORD( s_Locale.GetAt( e ).m_hKL ) ==
+// 							LOWORD( phKL[i] ) )
+// 						{
+// 							bBreak = true;
+// 							break;
+// 						}
 						if( bBreak )
 							break;
 
@@ -2009,10 +2022,27 @@ bool CDXUTIMEEditBox::StaticMsgProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 		break;
 
 	case WM_INPUTLANGCHANGE:
-		DXUTTRACE( L"WM_INPUTLANGCHANGE\n" );
+		wprintf( L"WM_INPUTLANGCHANGE\n" );
 		{
 			UINT uLang = GetPrimaryLanguage();
 			CheckToggleState(hWnd);
+
+			char imname[50] = {0};
+			GetKeyboardLayoutNameA(imname);
+			printf("keyboard layout: %s.\n", imname);
+
+			printf("language: %x\n", SORTIDFROMLCID(GetKeyboardLayout(0)));
+
+			for (int i=0; i<s_Locale.GetSize(); i++)
+			{
+				printf("s_Locale: %x\n", SORTIDFROMLCID(s_Locale.GetAt(i).m_hKL));
+				if( s_Locale.GetAt(i).m_hKL == GetKeyboardLayout(0) )
+				{
+					wprintf(s_Locale.GetAt(i).m_wszLang);
+					printf("\n");
+				}
+			}
+
 			if ( uLang != GetPrimaryLanguage() )
 			{
 				// Korean IME always inserts on keystroke.  Other IMEs do not.
@@ -2424,177 +2454,11 @@ bool CDXUTIMEEditBox::MsgProc( UINT uMsg, WPARAM wParam, LPARAM lParam )
 
 	case WM_IME_NOTIFY:
 		DXUTTRACE( L"WM_IME_NOTIFY %u\n", wParam );
-		switch( wParam )
 		{
-		case IMN_SETCONVERSIONMODE:
-			DXUTTRACE( L"  IMN_SETCONVERSIONMODE\n" );
-		case IMN_SETOPENSTATUS:
-			DXUTTRACE( L"  IMN_SETOPENSTATUS\n" );
-			CheckToggleState(m_hWnd);
-			break;
-
-		case IMN_OPENCANDIDATE:
-		case IMN_CHANGECANDIDATE:
+			if(OnIMENotify(m_hWnd, uMsg, wParam, lParam))
 			{
-				DXUTTRACE( wParam == IMN_CHANGECANDIDATE ? L"  IMN_CHANGECANDIDATE\n" : L"  IMN_OPENCANDIDATE\n" );
-
-				s_CandList.bShowWindow = true;
 				*trapped = true;
-				if( NULL == ( hImc = _ImmGetContext( m_hWnd) ) )
-					break;
-
-				LPCANDIDATELIST lpCandList = NULL;
-				DWORD dwLenRequired;
-
-				s_bShowReadingWindow = false;
-				// Retrieve the candidate list
-				dwLenRequired = _ImmGetCandidateListW( hImc, 0, NULL, 0 );
-				if( dwLenRequired )
-				{
-					lpCandList = (LPCANDIDATELIST)HeapAlloc( GetProcessHeap(), 0, dwLenRequired );
-					dwLenRequired = _ImmGetCandidateListW( hImc, 0, lpCandList, dwLenRequired );
-				}
-
-				if( lpCandList )
-				{
-					// Update candidate list data
-					s_CandList.dwSelection = lpCandList->dwSelection;
-					s_CandList.dwCount = lpCandList->dwCount;
-
-					int nPageTopIndex = 0;
-					s_CandList.dwPageSize = min( lpCandList->dwPageSize, MAX_CANDLIST );
-					if( GetPrimaryLanguage() == LANG_JAPANESE )
-					{
-						// Japanese IME organizes its candidate list a little
-						// differently from the other IMEs.
-						nPageTopIndex = ( s_CandList.dwSelection / s_CandList.dwPageSize ) * s_CandList.dwPageSize;
-					}
-					else
-						nPageTopIndex = lpCandList->dwPageStart;
-
-					// Make selection index relative to first entry of page
-					s_CandList.dwSelection = ( GetLanguage() == LANG_CHS && !GetImeId() ) ? (DWORD)-1
-						: s_CandList.dwSelection - nPageTopIndex;
-
-					ZeroMemory( s_CandList.awszCandidate, sizeof(s_CandList.awszCandidate) );
-					for( UINT i = nPageTopIndex, j = 0;
-						(DWORD)i < lpCandList->dwCount && j < s_CandList.dwPageSize;
-						i++, j++ )
-					{
-						// Initialize the candidate list strings
-						LPWSTR pwsz = s_CandList.awszCandidate[j];
-						// For every candidate string entry,
-						// write [index] + Space + [String] if vertical,
-						// write [index] + [String] + Space if horizontal.
-						*pwsz++ = (WCHAR)( L'0' + ( (j + 1) % 10 ) );  // Index displayed is 1 based
-						if( s_bVerticalCand )
-							*pwsz++ = L' ';
-						WCHAR *pwszNewCand = (LPWSTR)( (LPBYTE)lpCandList + lpCandList->dwOffset[i] );
-						while ( *pwszNewCand )
-							*pwsz++ = *pwszNewCand++;
-						if( !s_bVerticalCand )
-							*pwsz++ = L' ';
-						*pwsz = 0;  // Terminate
-					}
-
-					// Make dwCount in s_CandList be number of valid entries in the page.
-					s_CandList.dwCount = lpCandList->dwCount - lpCandList->dwPageStart;
-					if( s_CandList.dwCount > lpCandList->dwPageSize )
-						s_CandList.dwCount = lpCandList->dwPageSize;
-
-					HeapFree( GetProcessHeap(), 0, lpCandList );
-					_ImmReleaseContext( m_hWnd, hImc );
-
-					// Korean and old Chinese IME can't have selection.
-					// User must use the number hotkey or Enter to select
-					// a candidate.
-					if( GetPrimaryLanguage() == LANG_KOREAN ||
-						GetLanguage() == LANG_CHT && !GetImeId() )
-					{
-						s_CandList.dwSelection = (DWORD)-1;
-					}
-
-					// Initialize s_CandList.HoriCand if we have a
-					// horizontal candidate window.
-					if( !s_bVerticalCand )
-					{
-						WCHAR wszCand[256] = L"";
-
-						s_CandList.nFirstSelected = 0;
-						s_CandList.nHoriSelectedLen = 0;
-						for( UINT i = 0; i < MAX_CANDLIST; ++i )
-						{
-							if( s_CandList.awszCandidate[i][0] == L'\0' )
-								break;
-
-							WCHAR wszEntry[32];
-							StringCchPrintf( wszEntry, 32, L"%s ", s_CandList.awszCandidate[i] );
-							// If this is the selected entry, mark its char position.
-							if( s_CandList.dwSelection == i )
-							{
-								s_CandList.nFirstSelected = lstrlen( wszCand );
-								s_CandList.nHoriSelectedLen = lstrlen( wszEntry ) - 1;  // Minus space
-							}
-							StringCchCat( wszCand, 256, wszEntry );
-						}
-						wszCand[lstrlen(wszCand) - 1] = L'\0';  // Remove the last space
-						s_CandList.HoriCand.SetText( wszCand );
-					}
-				}
-				break;
 			}
-
-		case IMN_CLOSECANDIDATE:
-			{
-				DXUTTRACE( L"  IMN_CLOSECANDIDATE\n" );
-				s_CandList.bShowWindow = false;
-				if( !s_bShowReadingWindow )
-				{
-					s_CandList.dwCount = 0;
-					ZeroMemory( s_CandList.awszCandidate, sizeof(s_CandList.awszCandidate) );
-				}
-				*trapped = true;
-				break;
-			}
-
-		case IMN_PRIVATE:
-			DXUTTRACE( L"  IMN_PRIVATE\n" );
-			{
-				if( !s_CandList.bShowWindow )
-					GetPrivateReadingString(m_hWnd);
-
-				// Trap some messages to hide reading window
-				DWORD dwId = GetImeId();
-				switch( dwId )
-				{
-				case IMEID_CHT_VER42:
-				case IMEID_CHT_VER43:
-				case IMEID_CHT_VER44:
-				case IMEID_CHS_VER41:
-				case IMEID_CHS_VER42:
-					if( ( lParam == 1 ) || ( lParam == 2 ) )
-					{
-						*trapped = true;
-					}
-					break;
-
-				case IMEID_CHT_VER50:
-				case IMEID_CHT_VER51:
-				case IMEID_CHT_VER52:
-				case IMEID_CHT_VER60:
-				case IMEID_CHS_VER53:
-					if( (lParam == 16) || (lParam == 17) || (lParam == 26) || (lParam == 27) || (lParam == 28) )
-					{
-						*trapped = true;
-					}
-					break;
-				}
-			}
-			break;
-
-		default:
-			*trapped = true;
-			break;
 		}
 		break;
 
@@ -2644,6 +2508,185 @@ bool CDXUTIMEEditBox::MsgProc( UINT uMsg, WPARAM wParam, LPARAM lParam )
 	return *trapped;
 }
 
+bool CDXUTIMEEditBox::OnIMENotify(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
+{
+	bool ret = false;
+	HIMC hImc;
+	switch( wParam )
+	{
+	case IMN_SETCONVERSIONMODE:
+		DXUTTRACE( L"  IMN_SETCONVERSIONMODE\n" );
+	case IMN_SETOPENSTATUS:
+		DXUTTRACE( L"  IMN_SETOPENSTATUS\n" );
+		CheckToggleState(m_hWnd);
+		break;
+
+	case IMN_OPENCANDIDATE:
+	case IMN_CHANGECANDIDATE:
+		{
+			DXUTTRACE( wParam == IMN_CHANGECANDIDATE ? L"  IMN_CHANGECANDIDATE\n" : L"  IMN_OPENCANDIDATE\n" );
+
+			s_CandList.bShowWindow = true;
+			ret = true;
+			if( NULL == ( hImc = _ImmGetContext( m_hWnd) ) )
+				break;
+
+			LPCANDIDATELIST lpCandList = NULL;
+			DWORD dwLenRequired;
+
+			s_bShowReadingWindow = false;
+			// Retrieve the candidate list
+			dwLenRequired = _ImmGetCandidateListW( hImc, 0, NULL, 0 );
+			if( dwLenRequired )
+			{
+				lpCandList = (LPCANDIDATELIST)HeapAlloc( GetProcessHeap(), 0, dwLenRequired );
+				dwLenRequired = _ImmGetCandidateListW( hImc, 0, lpCandList, dwLenRequired );
+			}
+
+			if( lpCandList )
+			{
+				// Update candidate list data
+				s_CandList.dwSelection = lpCandList->dwSelection;
+				s_CandList.dwCount = lpCandList->dwCount;
+
+				int nPageTopIndex = 0;
+				s_CandList.dwPageSize = min( lpCandList->dwPageSize, MAX_CANDLIST );
+				if( GetPrimaryLanguage() == LANG_JAPANESE )
+				{
+					// Japanese IME organizes its candidate list a little
+					// differently from the other IMEs.
+					nPageTopIndex = ( s_CandList.dwSelection / s_CandList.dwPageSize ) * s_CandList.dwPageSize;
+				}
+				else
+					nPageTopIndex = lpCandList->dwPageStart;
+
+				// Make selection index relative to first entry of page
+				s_CandList.dwSelection = ( GetLanguage() == LANG_CHS && !GetImeId() ) ? (DWORD)-1
+					: s_CandList.dwSelection - nPageTopIndex;
+
+				ZeroMemory( s_CandList.awszCandidate, sizeof(s_CandList.awszCandidate) );
+				for( UINT i = nPageTopIndex, j = 0;
+					(DWORD)i < lpCandList->dwCount && j < s_CandList.dwPageSize;
+					i++, j++ )
+				{
+					// Initialize the candidate list strings
+					LPWSTR pwsz = s_CandList.awszCandidate[j];
+					// For every candidate string entry,
+					// write [index] + Space + [String] if vertical,
+					// write [index] + [String] + Space if horizontal.
+					*pwsz++ = (WCHAR)( L'0' + ( (j + 1) % 10 ) );  // Index displayed is 1 based
+					if( s_bVerticalCand )
+						*pwsz++ = L' ';
+					WCHAR *pwszNewCand = (LPWSTR)( (LPBYTE)lpCandList + lpCandList->dwOffset[i] );
+					while ( *pwszNewCand )
+						*pwsz++ = *pwszNewCand++;
+					if( !s_bVerticalCand )
+						*pwsz++ = L' ';
+					*pwsz = 0;  // Terminate
+				}
+
+				// Make dwCount in s_CandList be number of valid entries in the page.
+				s_CandList.dwCount = lpCandList->dwCount - lpCandList->dwPageStart;
+				if( s_CandList.dwCount > lpCandList->dwPageSize )
+					s_CandList.dwCount = lpCandList->dwPageSize;
+
+				HeapFree( GetProcessHeap(), 0, lpCandList );
+				_ImmReleaseContext( m_hWnd, hImc );
+
+				// Korean and old Chinese IME can't have selection.
+				// User must use the number hotkey or Enter to select
+				// a candidate.
+				if( GetPrimaryLanguage() == LANG_KOREAN ||
+					GetLanguage() == LANG_CHT && !GetImeId() )
+				{
+					s_CandList.dwSelection = (DWORD)-1;
+				}
+
+				// Initialize s_CandList.HoriCand if we have a
+				// horizontal candidate window.
+				if( !s_bVerticalCand )
+				{
+					WCHAR wszCand[256] = L"";
+
+					s_CandList.nFirstSelected = 0;
+					s_CandList.nHoriSelectedLen = 0;
+					for( UINT i = 0; i < MAX_CANDLIST; ++i )
+					{
+						if( s_CandList.awszCandidate[i][0] == L'\0' )
+							break;
+
+						WCHAR wszEntry[32];
+						StringCchPrintf( wszEntry, 32, L"%s ", s_CandList.awszCandidate[i] );
+						// If this is the selected entry, mark its char position.
+						if( s_CandList.dwSelection == i )
+						{
+							s_CandList.nFirstSelected = lstrlen( wszCand );
+							s_CandList.nHoriSelectedLen = lstrlen( wszEntry ) - 1;  // Minus space
+						}
+						StringCchCat( wszCand, 256, wszEntry );
+					}
+					wszCand[lstrlen(wszCand) - 1] = L'\0';  // Remove the last space
+					s_CandList.HoriCand.SetText( wszCand );
+				}
+			}
+			break;
+		}
+
+	case IMN_CLOSECANDIDATE:
+		{
+			DXUTTRACE( L"  IMN_CLOSECANDIDATE\n" );
+			s_CandList.bShowWindow = false;
+			if( !s_bShowReadingWindow )
+			{
+				s_CandList.dwCount = 0;
+				ZeroMemory( s_CandList.awszCandidate, sizeof(s_CandList.awszCandidate) );
+			}
+			ret = true;
+			break;
+		}
+
+	case IMN_PRIVATE:
+		DXUTTRACE( L"  IMN_PRIVATE\n" );
+		{
+			if( !s_CandList.bShowWindow )
+				GetPrivateReadingString(m_hWnd);
+
+			// Trap some messages to hide reading window
+			DWORD dwId = GetImeId();
+			switch( dwId )
+			{
+			case IMEID_CHT_VER42:
+			case IMEID_CHT_VER43:
+			case IMEID_CHT_VER44:
+			case IMEID_CHS_VER41:
+			case IMEID_CHS_VER42:
+				if( ( lParam == 1 ) || ( lParam == 2 ) )
+				{
+					ret = true;
+				}
+				break;
+
+			case IMEID_CHT_VER50:
+			case IMEID_CHT_VER51:
+			case IMEID_CHT_VER52:
+			case IMEID_CHT_VER60:
+			case IMEID_CHS_VER53:
+				if( (lParam == 16) || (lParam == 17) || (lParam == 26) || (lParam == 27) || (lParam == 28) )
+				{
+					ret = true;
+				}
+				break;
+			}
+		}
+		break;
+
+	default:
+		ret = true;
+		break;
+	}
+
+	return ret;
+}
 
 //--------------------------------------------------------------------------------------
 void CDXUTIMEEditBox::RenderCandidateReadingWindow( IDirect3DDevice9* pd3dDevice, float fElapsedTime, bool bReading )
@@ -5539,14 +5582,13 @@ LRESULT UIParent::WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 	if (bRet)
 		return TRUE;
 
-	using namespace CEGUI;
 	if (m_pDialog->MsgProc(hWnd, message, wParam, lParam))
 		return TRUE;
 
 	if( CDXUTIMEEditBox::StaticMsgProc( hWnd, message, wParam, lParam ) )
 		return TRUE;
-	else
-		return DefWindowProc(hWnd, message, wParam, lParam);
+
+	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
 void UIParent::DeviceReset_Direct3D92(HWND window, CEGUI::Renderer* renderer)
@@ -5582,10 +5624,15 @@ LRESULT CALLBACK UIParent::StaticWndProc(HWND hWnd, UINT message, WPARAM wParam,
 {
 	if (NULL==g_UIParent)
 	{
+		if( CDXUTIMEEditBox::StaticMsgProc( hWnd, message, wParam, lParam ) )
+			return TRUE;
+
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
-
-	return g_UIParent->WndProc(hWnd, message, wParam, lParam);
+	else
+	{
+		return g_UIParent->WndProc(hWnd, message, wParam, lParam);
+	}
 }
 
 HWND createApplicationWindow( int width, int height )
