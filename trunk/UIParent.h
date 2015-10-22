@@ -23,7 +23,7 @@
 inline int RectWidth( RECT &rc ) { return ( (rc).right - (rc).left ); }
 inline int RectHeight( RECT &rc ) { return ( (rc).bottom - (rc).top ); }
 
-#define DXUTTRACE                  (__noop)
+#define DXUTTRACE(s)                  wprintf(s)
 #define DXTRACE_MSG(str)              (0L)
 #define DXTRACE_ERR(str,hr)           (hr)
 
@@ -41,7 +41,6 @@ inline int RectHeight( RECT &rc ) { return ( (rc).bottom - (rc).top ); }
 #define DXTRACE_ERR_MSGBOX(str,hr)    (hr)
 #define DXUT_ERR(str,hr)           (hr)
 #define DXUT_ERR_MSGBOX(str,hr)    (hr)
-#define DXUTTRACE                  (__noop)
 #ifndef V
 #define V(x)           { hr = x; }
 #endif
@@ -622,8 +621,8 @@ public:
 
 protected:
 	static WORD GetLanguage() { return LOWORD( s_hklCurrent ); }
-	static WORD GetPrimaryLanguage() { return PRIMARYLANGID( LOWORD( s_hklCurrent ) ); }
-	static WORD GetSubLanguage() { return SUBLANGID( LOWORD( s_hklCurrent ) ); }
+	static WORD GetPrimaryLanguage();
+	static WORD GetSubLanguage();
 	static void SendKey( BYTE nVirtKey );
 	static DWORD GetImeId( UINT uIndex = 0 );
 	static void CheckInputLocale();
@@ -635,6 +634,7 @@ protected:
 	static void GetPrivateReadingString(HWND hWnd);
 
 	void SendCompString();
+	bool OnIMENotify(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );
 
 protected:
 	enum { INDICATOR_NON_IME, INDICATOR_CHS, INDICATOR_CHT, INDICATOR_KOREAN, INDICATOR_JAPANESE };
