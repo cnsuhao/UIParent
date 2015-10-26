@@ -2514,8 +2514,14 @@ bool CDXUTIMEEditBox::OnIMENotify(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 	HIMC hImc;
 	switch( wParam )
 	{
+	case IMN_CLOSESTATUSWINDOW:
+		DXUTTRACE( L"  IMN_CLOSESTATUSWINDOW\n" );
+		break;
+
 	case IMN_SETCONVERSIONMODE:
 		DXUTTRACE( L"  IMN_SETCONVERSIONMODE\n" );
+		break;
+
 	case IMN_SETOPENSTATUS:
 		DXUTTRACE( L"  IMN_SETOPENSTATUS\n" );
 		CheckToggleState(m_hWnd);
@@ -5876,6 +5882,11 @@ bool doWin32Events(bool& idle)
 	return true;
 }
 
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+#include <msctf.h>
+
 int main(_In_ int _Argc, _In_count_(_Argc) _Pre_z_ char ** _Argv, _In_z_ char ** _Env)
 {
 	HWND hWnd = createApplicationWindow(800, 600);
@@ -5886,6 +5897,52 @@ int main(_In_ int _Argc, _In_count_(_Argc) _Pre_z_ char ** _Argv, _In_z_ char **
 	CEGUI::Direct3D9Renderer::bootstrapSystem(device);
 	initialiseResourceGroupDirectories();
 	initialiseDefaultResourceGroups();
+
+	{
+		CoInitialize(0);
+		HRESULT hr = S_OK;
+
+		//PunCha：创建Profiles接口被
+		ITfInputProcessorProfiles *pProfiles;
+		hr = CoCreateInstance(  CLSID_TF_InputProcessorProfiles,
+			NULL,
+			CLSCTX_INPROC_SERVER,
+			IID_ITfInputProcessorProfiles,
+			(LPVOID*)&pProfiles);
+
+		if(SUCCEEDED(hr))
+		{
+			IEnumTfLanguageProfiles* pEnumProf = 0;
+			//PunCha：枚举所有输入法咯
+			hr = pProfiles->EnumLanguageProfiles(0x804, &pEnumProf);
+			if (SUCCEEDED(hr) && pEnumProf)
+			{
+				TF_LANGUAGEPROFILE proArr[2];
+				ULONG feOut = 0;
+				//PunCha：其实proArr这里应该写成 &proArr[0]，因为里面只需要一个TF_LANGUAGEPROFILE变量！而且，proArr[1]都没用到过！
+				while (S_OK == pEnumProf->Next(1, proArr, &feOut))
+				{
+					//PunCha：获取他的名字
+					BSTR bstrDest;
+					hr = pProfiles->GetLanguageProfileDescription(proArr[0].clsid, 0x804, proArr[0].guidProfile, &bstrDest);
+					OutputDebugString(bstrDest);
+					wprintf(bstrDest); printf("\n");
+
+					BOOL bEnable = false;
+					hr = pProfiles->IsEnabledLanguageProfile(proArr[0].clsid, 0x804, proArr[0].guidProfile, &bEnable);
+					if (SUCCEEDED(hr))
+					{
+						printf("Enabled %d\n", bEnable);
+					}
+					SysFreeString(bstrDest);
+				}
+			}
+
+			pProfiles->Release();
+		}
+
+		CoUninitialize();
+	}
 
 	UIParent uiparet;
 	g_UIParent = &uiparet;
