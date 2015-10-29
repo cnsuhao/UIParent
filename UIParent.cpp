@@ -5898,9 +5898,29 @@ int main(_In_ int _Argc, _In_count_(_Argc) _Pre_z_ char ** _Argv, _In_z_ char **
 	initialiseResourceGroupDirectories();
 	initialiseDefaultResourceGroups();
 
+	CoInitialize(0);
+	HRESULT hr = S_OK;
+
+
+//	{
+		ITfThreadMgr* pThreadMgr = NULL;
+
+		hr = CoCreateInstance(  CLSID_TF_ThreadMgr, 
+			NULL, 
+			CLSCTX_INPROC_SERVER, 
+			IID_ITfThreadMgr, 
+			(void**)&pThreadMgr);
+
+		TfClientId tid;
+		hr =  pThreadMgr->Activate( &tid);
+		ITfDocumentMgr *pdim;
+		hr = pThreadMgr->CreateDocumentMgr(&pdim);
+//	}
+
+
+
 	{
-		CoInitialize(0);
-		HRESULT hr = S_OK;
+
 
 		//PunCha：创建Profiles接口被
 		ITfInputProcessorProfiles *pProfiles;
@@ -5941,9 +5961,11 @@ int main(_In_ int _Argc, _In_count_(_Argc) _Pre_z_ char ** _Argv, _In_z_ char **
 			pProfiles->Release();
 		}
 
-		CoUninitialize();
 	}
 
+	CoUninitialize();
+
+	//////////////////////////////////////////////////////////////////////////
 	UIParent uiparet;
 	g_UIParent = &uiparet;
 	uiparet.Init(hWnd, device);
